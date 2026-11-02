@@ -1,0 +1,10 @@
+
+# SQLite and DB Browser files
+*.db
+*.db-journal
+*.sqbpro
+
+# SQLite and DB Browser files
+*.db
+*.db-journal
+*.sqbpro
