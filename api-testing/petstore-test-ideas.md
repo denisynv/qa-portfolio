@@ -27,8 +27,10 @@ Swagger UI marked the 200 returned by POST, PUT and DELETE as **Undocumented**.
 | 3 | PUT /pet (id 0, name doggie, extra field "sold" instead of "status") | 200 | Unknown field ignored; server generated id 9223372000001120000, no status field. Pet 987654 was not changed (GET still showed status available) |
 | 4 | DELETE /pet/987654 | 200 | Body: code 200, type unknown, message 987654 |
 | 5 | GET /pet/987654 | 404 | Body: code 1, type error, message Pet not found. Proves the delete worked |
+| 6 | PUT /pet (id 987654, name doggie, status sold), sent after the delete | 200 | Response shows id 987654 and status sold. No 404 although the pet had been deleted |
+| 7 | Follow-up response body (copied without its request header, assumed to be a GET) | 200 | Pet 987654 with status sold |
 
-Note: step 3 did not test what I intended (updating the status of my pet). With id 0 the server created a new record instead. See section 6.
+Note: in step 3 the server created a new record because the id was 0. The PUT in step 6 used the real id, but only after the pet had been deleted, so it is not a clean update test. See section 6.
 
 ## 3. Test ideas (5 per endpoint)
 
@@ -37,7 +39,7 @@ Note: step 3 did not test what I intended (updating the status of my pet). With 
 | # | Test idea | Input | Expected | Actual | Status |
 |---|---|---|---|---|---|
 | 1 | Valid pet is created | All fields valid | 200, body echoes data | 200, body identical to request | Pass |
-| 2 | Required field missing | Valid JSON without name | 4xx (spec lists 405) | Not run | Not executed |
+| 2 | Required field missing | Valid JSON without name | 4xx (spec lists 405) | Tried twice; Swagger UI rejected the body as invalid JSON, so nothing was sent | Open |
 | 3 | Wrong data type | photoUrls as the string "string" | 4xx | **500**, "something bad happened" | Bug candidate |
 | 4 | Value outside the enum | status "banana" | 4xx (spec lists 405) | **200**, "banana" echoed back | Bug candidate |
 | 5 | Empty body | {} | 4xx | **200**, pet created with generated id 9223372000001139000, photoUrls [] and tags [] | Bug candidate |
@@ -69,7 +71,8 @@ Note: step 3 did not test what I intended (updating the status of my pet). With 
 | 1 | Malformed JSON (a comma left over after deleting a line) | Swagger UI error: "Parameter string value must be valid JSON" | Client side. No request was sent |
 | 2 | photoUrls as a string instead of an array | 500, {"code":500,"type":"unknown","message":"something bad happened"} | Server |
 | 3 | status "banana" | 200, value accepted and echoed | Server |
-| 4 | id "abc" | Swagger UI error: "Value must be an integer" | Client side. No request was sent |
+| 4 | id "abc" (tried twice) | Swagger UI error: "Value must be an integer" | Client side. No request was sent |
+| 6 | Missing name, second try (name removed from pet, category and tag, trailing commas left) | Swagger UI error: "Parameter string value must be valid JSON" | Client side. No request was sent. Test still open |
 | 5 | Empty body {} | 200, pet created with generated id | Server |
 
 ## 5. Findings (bug candidates)
@@ -81,14 +84,17 @@ Note: step 3 did not test what I intended (updating the status of my pet). With 
 | F3 | Required fields are not enforced: an empty body creates a pet (verify which fields the Schema tab marks as required) | Medium | Section 4, row 5 |
 | F4 | Documentation gap: spec lists 405 for invalid input, which I never got; the 200 returned by POST, PUT and DELETE is undocumented | Low | Sections 1 and 4 |
 | F5 | PUT with id 0 silently creates a new pet with a huge generated id and ignores the unknown field "sold" | Low to Medium | Section 2, step 3 |
+| F6 | PUT on the id of a deleted pet returned 200 instead of 404, which looks like create-or-update behaviour (confirm with a clean test) | Low | Section 2, step 6 |
 
 This is a demo API, so some behaviour may be simplified on purpose. I treat these as practice findings.
 
 ## 6. Not done yet or to redo
 
 - [ ] Read the Schema tab and write down the required fields (red asterisk) and the allowed status values
-- [ ] Missing-name test with valid JSON (remove the whole "name" line including its comma)
-- [ ] PUT that really updates the status of an existing pet: create it, PUT with the same id and status "sold", GET to confirm, then DELETE
+- [ ] Missing-name test: remove ONLY the pet-level "name" line (keep the names inside category and tags) and check the JSON stays valid, with no trailing commas
+- [x] PUT with status "sold" sent to id 987654: 200, response shows status sold
+- [ ] Repeat as a clean update test: POST a new pet, PUT status "sold", GET to confirm, then DELETE
+- [ ] Clean up: DELETE /pet/987654 (the earlier PUT may have re-created it)
 - [ ] Non-numeric id on GET and DELETE, and deleting the same id twice
 - [ ] Repeat the id "abc" test in Postman, because Swagger UI blocks it before it reaches the server
 
