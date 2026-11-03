@@ -8,3 +8,9 @@
 *.db
 *.db-journal
 *.sqbpro
+
+# Python environment and caches
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
